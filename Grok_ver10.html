@@ -1,0 +1,1355 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <title>Grok小説プロンプト作成</title>
+  <style>
+    :root {
+      --bg: #0f1115;
+      --card: #1a1d24;
+      --sub-card: #14171d;
+      --text: #f0f2f5;
+      --muted: #8b949e;
+      --accent: #1d9bf0;
+      --accent-bg: rgba(29, 155, 240, 0.18);
+      --erotic: #e91e63;
+      --erotic-bg: rgba(233, 30, 99, 0.18);
+      --secret: #a371f7;
+      --secret-bg: rgba(163, 113, 247, 0.14);
+      --danger: #f85149;
+      --border: #2d333b;
+    }
+    * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+    body {
+      margin: 0;
+      padding: 16px 16px 100px;
+      font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.5;
+    }
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 14px;
+      gap: 8px;
+    }
+    .header-left {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+    h1 {
+      font-size: 1.08rem;
+      margin: 0;
+      letter-spacing: 0.02em;
+    }
+    .erotic-toggle {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      font-size: 0.78rem;
+      font-weight: 700;
+      color: var(--muted);
+      background: #252a34;
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 4px 10px;
+      cursor: pointer;
+      user-select: none;
+      transition: all 0.15s ease;
+    }
+    .erotic-toggle.active {
+      background: var(--erotic-bg);
+      border-color: var(--erotic);
+      color: #ff80ab;
+    }
+    .erotic-toggle input {
+      margin: 0;
+      accent-color: var(--erotic);
+      width: 14px;
+      height: 14px;
+    }
+    .erotic-panel {
+      display: none;
+      background: rgba(233, 30, 99, 0.08);
+      border: 1px solid rgba(233, 30, 99, 0.45);
+      border-radius: 14px;
+      padding: 12px 14px;
+      margin-bottom: 14px;
+    }
+    .erotic-panel.show { display: block; }
+    .erotic-levels {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 6px;
+    }
+    .erotic-level-btn {
+      background: #252a34;
+      color: var(--text);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 8px 4px;
+      text-align: center;
+      font-size: 0.82rem;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all 0.15s ease;
+      user-select: none;
+    }
+    .erotic-level-btn.active {
+      background: var(--erotic-bg);
+      border-color: var(--erotic);
+      color: #ff80ab;
+    }
+    .erotic-desc {
+      margin-top: 8px;
+      font-size: 0.78rem;
+      color: #f48fb1;
+    }
+
+    .btn-edit-mode {
+      background: #252a34;
+      color: var(--text);
+      border: 1px solid var(--border);
+      border-radius: 18px;
+      padding: 6px 12px;
+      font-size: 0.78rem;
+      font-weight: 600;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+    .btn-edit-mode.active {
+      background: rgba(248, 81, 73, 0.2);
+      border-color: var(--danger);
+      color: #ff7b72;
+    }
+
+    /* メインタブ（3タブ構成） */
+    .main-tabs {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 4px;
+      margin-bottom: 14px;
+      gap: 4px;
+    }
+    .main-tab {
+      text-align: center;
+      padding: 9px 4px;
+      font-size: 0.85rem;
+      font-weight: 700;
+      color: var(--muted);
+      border-radius: 9px;
+      cursor: pointer;
+      transition: all 0.15s ease;
+      white-space: nowrap;
+    }
+    .main-tab.active {
+      background: var(--accent);
+      color: #fff;
+    }
+    .badge {
+      display: inline-block;
+      background: rgba(255, 255, 255, 0.2);
+      border-radius: 10px;
+      padding: 1px 6px;
+      font-size: 0.72rem;
+      margin-left: 3px;
+    }
+
+    .tab-panel { display: none; }
+    .tab-panel.active { display: block; }
+
+    /* キャラ切り替えサブタブ */
+    .char-tabs {
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      gap: 6px;
+      margin-bottom: 14px;
+    }
+    .char-tab {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 8px 4px;
+      text-align: center;
+      font-size: 0.8rem;
+      font-weight: 600;
+      color: var(--muted);
+      cursor: pointer;
+      position: relative;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .char-tab.active {
+      background: var(--accent-bg);
+      border-color: var(--accent);
+      color: #60b8ff;
+    }
+    .char-tab.has-data::after {
+      content: "";
+      position: absolute;
+      top: 5px;
+      right: 5px;
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--accent);
+    }
+
+    /* 性別メイン選択 */
+    .gender-group {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+    }
+    .gender-btn {
+      background: #252a34;
+      color: var(--text);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 12px 0;
+      text-align: center;
+      font-size: 0.95rem;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all 0.15s ease;
+      user-select: none;
+    }
+    .gender-btn.active {
+      background: var(--accent-bg);
+      border-color: var(--accent);
+      color: #60b8ff;
+    }
+
+    .sub-block {
+      background: var(--sub-card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 12px;
+      margin-top: 12px;
+    }
+    .secret-block {
+      background: rgba(163, 113, 247, 0.06);
+      border: 1px solid rgba(163, 113, 247, 0.35);
+      border-radius: 12px;
+      padding: 12px;
+      margin-top: 12px;
+    }
+    .secret-title {
+      font-size: 0.85rem;
+      font-weight: 700;
+      color: #c297ff;
+      margin: 0 0 8px;
+    }
+    .timing-chips {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin: 8px 0;
+    }
+    .timing-chip {
+      background: #252a34;
+      color: var(--muted);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 4px 10px;
+      font-size: 0.76rem;
+      cursor: pointer;
+      user-select: none;
+    }
+    .timing-chip.active {
+      background: var(--secret-bg);
+      border-color: var(--secret);
+      color: #d2a8ff;
+      font-weight: 600;
+    }
+
+    .name-age-grid {
+      display: grid;
+      grid-template-columns: 1.4fr 1fr;
+      gap: 8px;
+    }
+    .field-label {
+      font-size: 0.8rem;
+      font-weight: 700;
+      color: var(--muted);
+      margin-bottom: 6px;
+    }
+    .char-header-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 10px;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+    .char-actions {
+      display: flex;
+      gap: 6px;
+    }
+    .btn-mini {
+      background: #252a34;
+      color: var(--text);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 5px 10px;
+      font-size: 0.75rem;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    .btn-mini.accent {
+      background: var(--accent-bg);
+      border-color: var(--accent);
+      color: #60b8ff;
+    }
+    .btn-mini.muted {
+      background: transparent;
+      color: var(--muted);
+    }
+
+    /* テンプレート一覧パネル */
+    .tpl-drawer {
+      display: none;
+      background: var(--sub-card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 12px;
+      margin-bottom: 12px;
+    }
+    .tpl-drawer.show { display: block; }
+    .tpl-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background: #1f242d;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 8px 10px;
+      margin-top: 8px;
+      gap: 8px;
+    }
+    .tpl-info {
+      flex: 1;
+      min-width: 0;
+      cursor: pointer;
+    }
+    .tpl-name {
+      font-size: 0.85rem;
+      font-weight: 700;
+      color: var(--text);
+    }
+    .tpl-meta {
+      font-size: 0.75rem;
+      color: var(--muted);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .btn-tpl-del {
+      background: transparent;
+      border: none;
+      color: #ff7b72;
+      font-size: 0.9rem;
+      font-weight: 700;
+      padding: 4px 8px;
+      cursor: pointer;
+    }
+
+    /* 関係性ビルダー */
+    .rel-row {
+      display: grid;
+      grid-template-columns: 1fr auto 1fr;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 8px;
+    }
+    .rel-row-2 {
+      display: flex;
+      gap: 8px;
+    }
+    select {
+      width: 100%;
+      background: #12151a;
+      color: var(--text);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 9px 10px;
+      font-size: 16px;
+      font-family: inherit;
+    }
+    .rel-list {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      margin-top: 12px;
+    }
+    .rel-chip {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background: #252a34;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 8px 12px;
+      font-size: 0.85rem;
+    }
+
+    .edit-banner {
+      display: none;
+      background: rgba(248, 81, 73, 0.12);
+      border: 1px solid rgba(248, 81, 73, 0.4);
+      border-radius: 12px;
+      padding: 10px 14px;
+      margin-bottom: 14px;
+      font-size: 0.82rem;
+      color: #ff9492;
+      justify-content: space-between;
+      align-items: center;
+      gap: 10px;
+    }
+    .edit-banner.show { display: flex; }
+    .btn-reset-default {
+      background: transparent;
+      color: #ff7b72;
+      border: 1px solid var(--danger);
+      border-radius: 8px;
+      padding: 5px 10px;
+      font-size: 0.75rem;
+      white-space: nowrap;
+      cursor: pointer;
+    }
+    .section {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 14px;
+      margin-bottom: 14px;
+    }
+    .section-title {
+      font-size: 0.85rem;
+      font-weight: 700;
+      color: var(--muted);
+      margin: 0 0 10px;
+    }
+    .tags {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+    .tag {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: #252a34;
+      color: var(--text);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      padding: 7px 13px;
+      font-size: 0.85rem;
+      cursor: pointer;
+      transition: all 0.15s ease;
+      user-select: none;
+    }
+    .tag.active {
+      background: var(--accent-bg);
+      border-color: var(--accent);
+      color: #60b8ff;
+      font-weight: 600;
+    }
+    .tag-add {
+      background: transparent;
+      border: 1px dashed var(--muted);
+      color: var(--muted);
+    }
+    .tag-del-icon {
+      display: none;
+      font-size: 0.8rem;
+      font-weight: 700;
+      color: #ff7b72;
+      margin-left: 2px;
+    }
+    body.edit-mode .tag-del-icon { display: inline; }
+    body.edit-mode .tag:not(.tag-add) {
+      border-color: rgba(248, 81, 73, 0.5);
+    }
+    .add-form {
+      display: none;
+      margin-top: 10px;
+      gap: 8px;
+    }
+    .add-form.show { display: flex; }
+    .text-input, .add-input {
+      width: 100%;
+      background: #12151a;
+      color: var(--text);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 9px 12px;
+      font-size: 16px;
+      font-family: inherit;
+    }
+    .add-input { flex: 1; width: auto; }
+    .text-input:focus, .add-input:focus, textarea:focus, select:focus {
+      outline: none;
+      border-color: var(--accent);
+    }
+    .btn-add-submit {
+      background: var(--accent);
+      color: #fff;
+      border: none;
+      border-radius: 10px;
+      padding: 8px 14px;
+      font-size: 0.85rem;
+      font-weight: 700;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+    textarea {
+      width: 100%;
+      background: #12151a;
+      color: var(--text);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 12px;
+      font-size: 16px;
+      font-family: inherit;
+      resize: vertical;
+      min-height: 90px;
+    }
+
+    /* 結果タブ用 */
+    .result-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 10px;
+    }
+    .char-count {
+      font-size: 0.78rem;
+      color: var(--muted);
+    }
+    .preview-box {
+      background: #12151a;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 14px;
+      font-size: 0.9rem;
+      white-space: pre-wrap;
+      color: #e6edf3;
+      min-height: 260px;
+      line-height: 1.65;
+    }
+
+    .footer-bar {
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      background: rgba(15, 17, 21, 0.92);
+      backdrop-filter: blur(10px);
+      border-top: 1px solid var(--border);
+      padding: 12px 16px calc(12px + env(safe-area-inset-bottom));
+      display: flex;
+      gap: 10px;
+    }
+    .footer-bar button {
+      border: none;
+      border-radius: 12px;
+      font-size: 0.95rem;
+      font-weight: 700;
+      padding: 13px;
+      cursor: pointer;
+    }
+    .btn-clear {
+      background: #252a34;
+      color: var(--muted);
+      width: 30%;
+    }
+    .btn-copy {
+      background: var(--accent);
+      color: #fff;
+      width: 70%;
+    }
+    .btn-copy.copied { background: #2ea043; }
+  </style>
+</head>
+<body>
+
+  <div class="header">
+    <div class="header-left">
+      <h1>Grok 小説プロンプト作成</h1>
+      <label id="eroticToggleLabel" class="erotic-toggle">
+        <input type="checkbox" id="eroticCheck" onchange="toggleEroticMode()">
+        <span>官能</span>
+      </label>
+    </div>
+    <button id="editModeBtn" class="btn-edit-mode" onclick="toggleEditMode()">ワード編集</button>
+  </div>
+
+  <!-- 官能表現の濃淡パネル（チェック時のみ表示） -->
+  <div id="eroticPanel" class="erotic-panel">
+    <div class="section-title" style="color:#ff80ab; margin-bottom:8px;">官能表現の濃淡</div>
+    <div id="eroticLevels" class="erotic-levels"></div>
+    <div id="eroticDesc" class="erotic-desc"></div>
+  </div>
+
+  <div id="editBanner" class="edit-banner">
+    <span>削除したいワードをタップしてください</span>
+    <button class="btn-reset-default" onclick="resetToDefaultWords()">初期値に戻す</button>
+  </div>
+
+  <!-- メインタブ（3つ） -->
+  <div class="main-tabs">
+    <div id="tabBtnStory" class="main-tab active" onclick="switchMainTab('story')">作品設定</div>
+    <div id="tabBtnChars" class="main-tab" onclick="switchMainTab('chars')">登場人物<span id="charCountBadge" class="badge">0/5</span></div>
+    <div id="tabBtnResult" class="main-tab" onclick="switchMainTab('result')">結果</div>
+  </div>
+
+  <!-- タブ1：作品設定 -->
+  <div id="panelStory" class="tab-panel active">
+    <div id="storyCategories"></div>
+
+    <div class="section">
+      <div class="section-title">フリー入力（あらすじ・入れたいセリフ・細かい指示など）</div>
+      <textarea id="freeText" placeholder="例：記憶を失った機械人形と、皮肉屋の悪魔が滅びた都市を旅する話。"></textarea>
+    </div>
+  </div>
+
+  <!-- タブ2：登場人物（最大5人） -->
+  <div id="panelChars" class="tab-panel">
+    <div id="charTabs" class="char-tabs"></div>
+    <div id="charEditor"></div>
+
+    <!-- キャラ同士の関係性 -->
+    <div class="section">
+      <div class="section-title">キャラ同士の関係性</div>
+      <div class="rel-row">
+        <select id="relCharA"></select>
+        <span style="color:var(--muted); font-weight:700;">×</span>
+        <select id="relCharB"></select>
+      </div>
+      <div class="rel-row-2">
+        <select id="relType" style="flex:1;"></select>
+        <button type="button" class="btn-add-submit" onclick="addRelation()">追加</button>
+      </div>
+      <div id="relList" class="rel-list"></div>
+    </div>
+  </div>
+
+  <!-- タブ3：結果（生成されたプロンプト） -->
+  <div id="panelResult" class="tab-panel">
+    <div class="section">
+      <div class="result-header">
+        <div class="section-title" style="margin:0;">生成されたプロンプト</div>
+        <div id="promptLength" class="char-count">0文字</div>
+      </div>
+      <div id="preview" class="preview-box"></div>
+    </div>
+  </div>
+
+  <div class="footer-bar">
+    <button class="btn-clear" onclick="resetSelection()">全クリア</button>
+    <button id="copyBtn" class="btn-copy" onclick="copyPrompt()">プロンプトをコピー</button>
+  </div>
+
+  <script>
+    const STORAGE_WORDS_KEY = "grok_novel_prompt_words_v2";
+    const STORAGE_TPL_KEY = "grok_novel_char_templates_v1";
+    const MAX_CHARS = 5;
+    const GENDERS = ["男性", "女性", "なし"];
+    const RELATION_TYPES = [
+      "相棒・バディ", "主従関係", "契約関係", "敵対・宿敵", "ライバル",
+      "師弟関係", "恋人・恋愛関係", "片思い", "家族・血縁", "幼なじみ",
+      "腐れ縁", "共犯者", "初対面", "過去に因縁あり"
+    ];
+    const SECRET_TIMINGS = [
+      "物語の後半まで伏せる",
+      "終盤のどんでん返しまで伏せる",
+      "伏線だけ張り、今回は明かさない",
+      "主人公が危機に陥った時に明かす"
+    ];
+    const EROTIC_LEVELS = [
+      { id: "soft", label: "ソフト", desc: "情緒的・暗示的な描写を中心に、ロマンチックな雰囲気で描く" },
+      { id: "normal", label: "標準", desc: "官能的な空気感と心理・感覚描写をバランスよく描く" },
+      { id: "rich", label: "濃厚", desc: "具体的で艶めかしい身体・感覚描写をしっかりと盛り込む" },
+      { id: "hard", label: "過激", desc: "遠慮なく直接的で踏み込んだ濃厚な官能描写にする" }
+    ];
+
+    const DEFAULT_WORDS = {
+      story: [
+        {
+          id: "genre",
+          name: "ジャンル",
+          items: ["異世界ファンタジー", "現代恋愛", "SF・サイバーパンク", "ミステリー", "ホラー・怪談", "コメディ", "ダークファンタジー", "和風ファンタジー", "日常系"]
+        },
+        {
+          id: "tone",
+          name: "文体・トーン",
+          items: ["軽快で読みやすい", "重厚で文学的", "シリアス・ダーク", "ユーモア・皮肉多め", "ラノベ風", "詩的・叙情的"]
+        },
+        {
+          id: "pov",
+          name: "視点",
+          items: ["一人称（私・僕）", "一人称（俺）", "三人称一元視点", "三人称（神視点）"]
+        },
+        {
+          id: "rules",
+          name: "構成・ルール",
+          items: ["セリフ多め", "情景描写を丁寧に", "伏線を張る", "最後にどんでん返し", "1,500字程度で", "続きが気になる引きで終わる"]
+        }
+      ],
+      char: {
+        race: {
+          name: "種族・人外",
+          items: ["人間", "悪魔", "鬼", "機械・アンドロイド", "AI・人工知能", "エルフ", "吸血鬼", "獣人", "天使", "竜・ドラゴン", "妖怪・幽霊", "神・精霊"]
+        },
+        job: {
+          name: "職業・立場",
+          items: ["学生", "会社員", "探偵", "医者", "騎士・剣士", "魔法使い", "冒険者", "暗殺者", "王族・貴族", "執事・メイド", "研究者・科学者", "無職・放浪者"]
+        },
+        appearance: {
+          name: "外見的特徴（身長・スタイルなど）",
+          items: ["高身長", "小柄", "スレンダー", "筋肉質", "グラマー", "中性的", "長髪", "短髪", "美形", "傷跡がある", "角や翼がある", "無機質な外見"]
+        },
+        personality: {
+          name: "内面的特徴（性格など）",
+          items: ["冷静沈着", "毒舌", "皮肉屋", "優しい", "熱血", "ミステリアス", "冷徹", "お調子者", "臆病", "傲慢", "不器用", "記憶喪失"]
+        }
+      }
+    };
+
+    let words = loadJson(STORAGE_WORDS_KEY, DEFAULT_WORDS);
+    // 既存の保存データに「職業」がない場合でも自動で補完
+    if (!words.char.job) {
+      words.char.job = JSON.parse(JSON.stringify(DEFAULT_WORDS.char.job));
+      saveJson(STORAGE_WORDS_KEY, words);
+    }
+
+    let charTemplates = loadJson(STORAGE_TPL_KEY, []);
+    let isEditMode = false;
+    let isEroticMode = false;
+    let eroticLevelIndex = 1;
+    let isTplDrawerOpen = false;
+    let activeCharIndex = 0;
+
+    const storySelected = {};
+    let characters = Array.from({ length: MAX_CHARS }, () => createEmptyChar());
+    let relations = [];
+
+    const storyContainer = document.getElementById("storyCategories");
+    const charTabsEl = document.getElementById("charTabs");
+    const charEditorEl = document.getElementById("charEditor");
+    const freeText = document.getElementById("freeText");
+    const preview = document.getElementById("preview");
+    const promptLengthEl = document.getElementById("promptLength");
+
+    function loadJson(key, fallback) {
+      try {
+        const saved = localStorage.getItem(key);
+        if (saved) return JSON.parse(saved);
+      } catch (e) {}
+      return JSON.parse(JSON.stringify(fallback));
+    }
+
+    function saveJson(key, val) {
+      try {
+        localStorage.setItem(key, JSON.stringify(val));
+      } catch (e) {}
+    }
+
+    function toggleEroticMode() {
+      isEroticMode = document.getElementById("eroticCheck").checked;
+      document.getElementById("eroticToggleLabel").classList.toggle("active", isEroticMode);
+      document.getElementById("eroticPanel").classList.toggle("show", isEroticMode);
+      renderEroticLevels();
+      updatePreview();
+    }
+
+    function renderEroticLevels() {
+      const container = document.getElementById("eroticLevels");
+      const descEl = document.getElementById("eroticDesc");
+      container.innerHTML = "";
+      EROTIC_LEVELS.forEach((lv, idx) => {
+        const btn = document.createElement("div");
+        btn.className = "erotic-level-btn" + (idx === eroticLevelIndex ? " active" : "");
+        btn.textContent = lv.label;
+        btn.onclick = () => {
+          eroticLevelIndex = idx;
+          renderEroticLevels();
+          updatePreview();
+        };
+        container.appendChild(btn);
+      });
+      descEl.textContent = EROTIC_LEVELS[eroticLevelIndex].desc;
+    }
+
+    function createEmptyChar() {
+      return {
+        gender: "",
+        name: "",
+        age: "",
+        race: new Set(),
+        job: new Set(),
+        appearance: new Set(),
+        personality: new Set(),
+        secret: "",
+        secretTiming: ""
+      };
+    }
+
+    function isCharActive(c) {
+      return Boolean(
+        c.gender ||
+        c.name.trim() ||
+        c.age.trim() ||
+        c.race.size > 0 ||
+        c.job.size > 0 ||
+        c.appearance.size > 0 ||
+        c.personality.size > 0 ||
+        c.secret.trim()
+      );
+    }
+
+    function getCharDisplayName(index) {
+      const n = characters[index].name.trim();
+      return n ? n : `人物${index + 1}`;
+    }
+
+    function switchMainTab(tab) {
+      document.getElementById("tabBtnStory").classList.toggle("active", tab === "story");
+      document.getElementById("tabBtnChars").classList.toggle("active", tab === "chars");
+      document.getElementById("tabBtnResult").classList.toggle("active", tab === "result");
+      document.getElementById("panelStory").classList.toggle("active", tab === "story");
+      document.getElementById("panelChars").classList.toggle("active", tab === "chars");
+      document.getElementById("panelResult").classList.toggle("active", tab === "result");
+      if (tab === "result") updatePreview();
+    }
+
+    function createTagBlock(title, itemsArray, selectedSet, isSubBlock = false) {
+      const box = document.createElement("div");
+      box.className = isSubBlock ? "sub-block" : "section";
+      box.innerHTML = `<div class="section-title">${escapeHtml(title)}</div><div class="tags"></div>`;
+      const tagsDiv = box.querySelector(".tags");
+
+      itemsArray.forEach((item, idx) => {
+        const btn = document.createElement("div");
+        btn.className = "tag" + (selectedSet.has(item) ? " active" : "");
+        btn.innerHTML = `<span>${escapeHtml(item)}</span><span class="tag-del-icon">×</span>`;
+
+        btn.onclick = () => {
+          if (isEditMode) {
+            itemsArray.splice(idx, 1);
+            selectedSet.delete(item);
+            characters.forEach(c => {
+              c.race.delete(item);
+              c.job.delete(item);
+              c.appearance.delete(item);
+              c.personality.delete(item);
+            });
+            saveJson(STORAGE_WORDS_KEY, words);
+            renderAll();
+          } else {
+            if (selectedSet.has(item)) {
+              selectedSet.delete(item);
+              btn.classList.remove("active");
+            } else {
+              selectedSet.add(item);
+              btn.classList.add("active");
+            }
+            updateCharTabsAndBadge();
+            updatePreview();
+          }
+        };
+        tagsDiv.appendChild(btn);
+      });
+
+      const addBtn = document.createElement("div");
+      addBtn.className = "tag tag-add";
+      addBtn.textContent = "＋ 追加";
+      tagsDiv.appendChild(addBtn);
+
+      const form = document.createElement("div");
+      form.className = "add-form";
+      form.innerHTML = `
+        <input type="text" class="add-input" placeholder="新しいワードを入力...">
+        <button type="button" class="btn-add-submit">保存</button>
+      `;
+      const input = form.querySelector(".add-input");
+      const submitBtn = form.querySelector(".btn-add-submit");
+
+      addBtn.onclick = () => {
+        const isOpen = form.classList.toggle("show");
+        if (isOpen) input.focus();
+      };
+
+      const addNewWord = () => {
+        const val = input.value.trim();
+        if (!val) return;
+        if (!itemsArray.includes(val)) {
+          itemsArray.push(val);
+          saveJson(STORAGE_WORDS_KEY, words);
+        }
+        selectedSet.add(val);
+        input.value = "";
+        renderAll();
+      };
+
+      submitBtn.onclick = addNewWord;
+      input.addEventListener("keydown", (e) => {
+        if (e.key === "Enter") {
+          e.preventDefault();
+          addNewWord();
+        }
+      });
+
+      box.appendChild(form);
+      return box;
+    }
+
+    function renderStory() {
+      storyContainer.innerHTML = "";
+      words.story.forEach(cat => {
+        if (!storySelected[cat.id]) storySelected[cat.id] = new Set();
+        const sec = createTagBlock(cat.name, cat.items, storySelected[cat.id], false);
+        storyContainer.appendChild(sec);
+      });
+    }
+
+    function updateCharTabsAndBadge() {
+      let activeCount = 0;
+      charTabsEl.innerHTML = "";
+
+      characters.forEach((c, i) => {
+        const hasData = isCharActive(c);
+        if (hasData) activeCount++;
+
+        const tab = document.createElement("div");
+        tab.className = "char-tab" + (i === activeCharIndex ? " active" : "") + (hasData ? " has-data" : "");
+        const label = c.name.trim() ? c.name.trim().slice(0, 4) : `人物${i + 1}`;
+        tab.textContent = label;
+        tab.onclick = () => {
+          activeCharIndex = i;
+          renderCharEditor();
+          updateCharTabsAndBadge();
+        };
+        charTabsEl.appendChild(tab);
+      });
+
+      document.getElementById("charCountBadge").textContent = `${activeCount}/${MAX_CHARS}`;
+      renderRelationSelects();
+      renderRelationList();
+    }
+
+    function saveCurrentCharAsTemplate() {
+      const char = characters[activeCharIndex];
+      if (!isCharActive(char)) {
+        alert("保存する設定が入力されていません。");
+        return;
+      }
+      const defaultTitle = char.name.trim() || `テンプレ${charTemplates.length + 1}`;
+      const title = prompt("テンプレート名を入力してください：", defaultTitle);
+      if (!title || !title.trim()) return;
+
+      charTemplates.unshift({
+        id: Date.now(),
+        title: title.trim(),
+        gender: char.gender,
+        name: char.name,
+        age: char.age,
+        race: Array.from(char.race),
+        job: Array.from(char.job),
+        appearance: Array.from(char.appearance),
+        personality: Array.from(char.personality),
+        secret: char.secret,
+        secretTiming: char.secretTiming
+      });
+      saveJson(STORAGE_TPL_KEY, charTemplates);
+      isTplDrawerOpen = true;
+      renderCharEditor();
+    }
+
+    function applyTemplateToCurrentChar(tplId) {
+      const tpl = charTemplates.find(t => t.id === tplId);
+      if (!tpl) return;
+      characters[activeCharIndex] = {
+        gender: tpl.gender || "",
+        name: tpl.name || "",
+        age: tpl.age || "",
+        race: new Set(tpl.race || []),
+        job: new Set(tpl.job || []),
+        appearance: new Set(tpl.appearance || []),
+        personality: new Set(tpl.personality || []),
+        secret: tpl.secret || "",
+        secretTiming: tpl.secretTiming || ""
+      };
+      isTplDrawerOpen = false;
+      renderAll();
+    }
+
+    function deleteTemplate(tplId) {
+      if (!confirm("このテンプレートを削除しますか？")) return;
+      charTemplates = charTemplates.filter(t => t.id !== tplId);
+      saveJson(STORAGE_TPL_KEY, charTemplates);
+      renderCharEditor();
+    }
+
+    function renderCharEditor() {
+      const char = characters[activeCharIndex];
+      charEditorEl.innerHTML = "";
+
+      const card = document.createElement("div");
+      card.className = "section";
+
+      const headerRow = document.createElement("div");
+      headerRow.className = "char-header-row";
+      headerRow.innerHTML = `
+        <div class="section-title" style="margin:0;">人物${activeCharIndex + 1}：性別（メイン）</div>
+        <div class="char-actions">
+          <button type="button" class="btn-mini accent" id="btnTplSave">テンプレ保存</button>
+          <button type="button" class="btn-mini" id="btnTplLoad">呼出 (${charTemplates.length})</button>
+          <button type="button" class="btn-mini muted" id="btnCharClear">クリア</button>
+        </div>
+      `;
+      headerRow.querySelector("#btnTplSave").onclick = saveCurrentCharAsTemplate;
+      headerRow.querySelector("#btnTplLoad").onclick = () => {
+        isTplDrawerOpen = !isTplDrawerOpen;
+        renderCharEditor();
+      };
+      headerRow.querySelector("#btnCharClear").onclick = () => {
+        characters[activeCharIndex] = createEmptyChar();
+        renderAll();
+      };
+      card.appendChild(headerRow);
+
+      const drawer = document.createElement("div");
+      drawer.className = "tpl-drawer" + (isTplDrawerOpen ? " show" : "");
+      if (charTemplates.length === 0) {
+        drawer.innerHTML = `<div style="font-size:0.8rem; color:var(--muted);">保存済みのテンプレートはありません。「テンプレ保存」から登録できます。</div>`;
+      } else {
+        drawer.innerHTML = `<div class="section-title" style="margin-bottom:4px;">タップして「人物${activeCharIndex + 1}」に読み込み</div>`;
+        charTemplates.forEach(tpl => {
+          const metaParts = [];
+          if (tpl.gender) metaParts.push(tpl.gender);
+          if (tpl.age?.trim()) metaParts.push(tpl.age.trim());
+          if (tpl.race?.length) metaParts.push(tpl.race.join("・"));
+          if (tpl.job?.length) metaParts.push(tpl.job.join("・"));
+          if (tpl.secret?.trim()) metaParts.push("裏設定あり");
+
+          const item = document.createElement("div");
+          item.className = "tpl-item";
+          item.innerHTML = `
+            <div class="tpl-info">
+              <div class="tpl-name">${escapeHtml(tpl.title)}</div>
+              <div class="tpl-meta">${escapeHtml(metaParts.join(" / ") || "設定あり")}</div>
+            </div>
+            <button type="button" class="btn-tpl-del">×</button>
+          `;
+          item.querySelector(".tpl-info").onclick = () => applyTemplateToCurrentChar(tpl.id);
+          item.querySelector(".btn-tpl-del").onclick = () => deleteTemplate(tpl.id);
+          drawer.appendChild(item);
+        });
+      }
+      card.appendChild(drawer);
+
+      const genderGroup = document.createElement("div");
+      genderGroup.className = "gender-group";
+      GENDERS.forEach(g => {
+        const gBtn = document.createElement("div");
+        gBtn.className = "gender-btn" + (char.gender === g ? " active" : "");
+        gBtn.textContent = g;
+        gBtn.onclick = () => {
+          char.gender = (char.gender === g) ? "" : g;
+          renderCharEditor();
+          updateCharTabsAndBadge();
+          updatePreview();
+        };
+        genderGroup.appendChild(gBtn);
+      });
+      card.appendChild(genderGroup);
+
+      const nameAgeBlock = document.createElement("div");
+      nameAgeBlock.className = "sub-block";
+      nameAgeBlock.innerHTML = `
+        <div class="name-age-grid">
+          <div>
+            <div class="field-label">名前（任意）</div>
+            <input type="text" id="charNameInput" class="text-input" placeholder="例：カイン、アリス" value="${escapeHtml(char.name)}">
+          </div>
+          <div>
+            <div class="field-label">年齢（任意）</div>
+            <input type="text" id="charAgeInput" class="text-input" placeholder="例：24歳、不詳" value="${escapeHtml(char.age)}">
+          </div>
+        </div>
+      `;
+      nameAgeBlock.querySelector("#charNameInput").addEventListener("input", (e) => {
+        char.name = e.target.value;
+        updateCharTabsAndBadge();
+        updatePreview();
+      });
+      nameAgeBlock.querySelector("#charAgeInput").addEventListener("input", (e) => {
+        char.age = e.target.value;
+        updateCharTabsAndBadge();
+        updatePreview();
+      });
+      card.appendChild(nameAgeBlock);
+
+      card.appendChild(createTagBlock(words.char.race.name, words.char.race.items, char.race, true));
+      card.appendChild(createTagBlock(words.char.job.name, words.char.job.items, char.job, true));
+      card.appendChild(createTagBlock(words.char.appearance.name, words.char.appearance.items, char.appearance, true));
+      card.appendChild(createTagBlock(words.char.personality.name, words.char.personality.items, char.personality, true));
+
+      // サブ：裏設定・伏せておく設定
+      const secretBlock = document.createElement("div");
+      secretBlock.className = "secret-block";
+      secretBlock.innerHTML = `
+        <div class="secret-title">裏設定・伏せておく設定（任意）</div>
+        <textarea id="charSecretInput" style="min-height:68px;" placeholder="例：実は人間ではなく悪魔の王族。普段は正体を隠している。">${escapeHtml(char.secret)}</textarea>
+        <div class="field-label" style="margin-top:10px; color:#c297ff;">公開タイミング・扱い</div>
+        <div class="timing-chips" id="timingChips"></div>
+        <input type="text" id="charTimingInput" class="text-input" placeholder="自由入力もOK（例：二人きりになった夜に明かす）" value="${escapeHtml(char.secretTiming)}">
+      `;
+
+      const secretInput = secretBlock.querySelector("#charSecretInput");
+      const timingInput = secretBlock.querySelector("#charTimingInput");
+      const chipsContainer = secretBlock.querySelector("#timingChips");
+
+      const updateTimingChipsUI = () => {
+        chipsContainer.querySelectorAll(".timing-chip").forEach(el => {
+          el.classList.toggle("active", el.dataset.val === char.secretTiming);
+        });
+      };
+
+      SECRET_TIMINGS.forEach(t => {
+        const chip = document.createElement("div");
+        chip.className = "timing-chip" + (char.secretTiming === t ? " active" : "");
+        chip.dataset.val = t;
+        chip.textContent = t;
+        chip.onclick = () => {
+          char.secretTiming = (char.secretTiming === t) ? "" : t;
+          timingInput.value = char.secretTiming;
+          updateTimingChipsUI();
+          updatePreview();
+        };
+        chipsContainer.appendChild(chip);
+      });
+
+      secretInput.addEventListener("input", (e) => {
+        char.secret = e.target.value;
+        updateCharTabsAndBadge();
+        updatePreview();
+      });
+      timingInput.addEventListener("input", (e) => {
+        char.secretTiming = e.target.value;
+        updateTimingChipsUI();
+        updatePreview();
+      });
+
+      card.appendChild(secretBlock);
+      charEditorEl.appendChild(card);
+    }
+
+    function renderRelationSelects() {
+      const selA = document.getElementById("relCharA");
+      const selB = document.getElementById("relCharB");
+      const selType = document.getElementById("relType");
+
+      const prevA = selA.value || "0";
+      const prevB = selB.value || "1";
+
+      let optionsHtml = "";
+      for (let i = 0; i < MAX_CHARS; i++) {
+        optionsHtml += `<option value="${i}">${escapeHtml(getCharDisplayName(i))}</option>`;
+      }
+      selA.innerHTML = optionsHtml;
+      selB.innerHTML = optionsHtml;
+      selA.value = prevA;
+      selB.value = prevB;
+
+      if (selType.options.length === 0) {
+        RELATION_TYPES.forEach(t => {
+          const opt = document.createElement("option");
+          opt.value = t;
+          opt.textContent = t;
+          selType.appendChild(opt);
+        });
+      }
+    }
+
+    function addRelation() {
+      const a = Number(document.getElementById("relCharA").value);
+      const b = Number(document.getElementById("relCharB").value);
+      const type = document.getElementById("relType").value;
+
+      if (a === b) {
+        alert("異なる2人の人物を選んでください。");
+        return;
+      }
+      relations.push({ a, b, type });
+      renderRelationList();
+      updatePreview();
+    }
+
+    function removeRelation(idx) {
+      relations.splice(idx, 1);
+      renderRelationList();
+      updatePreview();
+    }
+
+    function renderRelationList() {
+      const list = document.getElementById("relList");
+      list.innerHTML = "";
+      relations.forEach((r, idx) => {
+        const chip = document.createElement("div");
+        chip.className = "rel-chip";
+        chip.innerHTML = `
+          <span>${escapeHtml(getCharDisplayName(r.a))} × ${escapeHtml(getCharDisplayName(r.b))}：<strong>${escapeHtml(r.type)}</strong></span>
+          <button type="button" class="btn-tpl-del">×</button>
+        `;
+        chip.querySelector("button").onclick = () => removeRelation(idx);
+        list.appendChild(chip);
+      });
+    }
+
+    function renderAll() {
+      renderEroticLevels();
+      renderStory();
+      renderCharEditor();
+      updateCharTabsAndBadge();
+      updatePreview();
+    }
+
+    function toggleEditMode() {
+      isEditMode = !isEditMode;
+      document.body.classList.toggle("edit-mode", isEditMode);
+      const btn = document.getElementById("editModeBtn");
+      const banner = document.getElementById("editBanner");
+      btn.classList.toggle("active", isEditMode);
+      btn.textContent = isEditMode ? "完了" : "ワード編集";
+      banner.classList.toggle("show", isEditMode);
+    }
+
+    function resetToDefaultWords() {
+      if (!confirm("追加・削除したワードをすべて初期状態に戻しますか？（キャラテンプレートは残ります）")) return;
+      words = JSON.parse(JSON.stringify(DEFAULT_WORDS));
+      saveJson(STORAGE_WORDS_KEY, words);
+      resetSelection();
+      toggleEditMode();
+    }
+
+    function escapeHtml(str) {
+      return String(str).replace(/[&<>"']/g, m => ({
+        "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
+      }[m]));
+    }
+
+    freeText.addEventListener("input", updatePreview);
+
+    function buildPrompt() {
+      const intro = isEroticMode
+        ? "以下の条件で官能小説を執筆してください。\n"
+        : "以下の条件で小説を執筆してください。\n";
+      let lines = [intro];
+
+      if (isEroticMode) {
+        const lv = EROTIC_LEVELS[eroticLevelIndex];
+        lines.push(`・官能表現の濃淡：${lv.label}（${lv.desc}）`);
+      }
+
+      words.story.forEach(cat => {
+        const vals = Array.from(storySelected[cat.id] || []);
+        if (vals.length > 0) {
+          lines.push(`・${cat.name}：${vals.join("、")}`);
+        }
+      });
+
+      const charLines = [];
+      let hasAnySecret = false;
+
+      characters.forEach((c, i) => {
+        if (!isCharActive(c)) return;
+        const label = `【${getCharDisplayName(i)}】`;
+        const details = [];
+        if (c.gender) details.push(`性別：${c.gender}`);
+        if (c.age.trim()) details.push(`年齢：${c.age.trim()}`);
+        if (c.race.size > 0) details.push(`種族：${Array.from(c.race).join("・")}`);
+        if (c.job.size > 0) details.push(`職業：${Array.from(c.job).join("・")}`);
+        if (c.appearance.size > 0) details.push(`外見：${Array.from(c.appearance).join("、")}`);
+        if (c.personality.size > 0) details.push(`内面：${Array.from(c.personality).join("、")}`);
+        charLines.push(`・${label} ${details.join(" / ")}`);
+
+        if (c.secret.trim()) {
+          hasAnySecret = true;
+          const timing = c.secretTiming.trim() || "指定のタイミングまで伏せる";
+          charLines.push(`  └ 裏設定（伏せる情報）：${c.secret.trim()}［扱い：${timing}］`);
+        }
+      });
+
+      if (charLines.length > 0) {
+        lines.push("\n【登場人物】");
+        lines.push(...charLines);
+      }
+
+      if (hasAnySecret) {
+        lines.push("※「裏設定（伏せる情報）」は、指定されたタイミングまで作中で直接明かさず、言動の違和感や伏線としてのみ自然に反映させてください。");
+      }
+
+      if (relations.length > 0) {
+        lines.push("\n【人物同士の関係性】");
+        relations.forEach(r => {
+          lines.push(`・${getCharDisplayName(r.a)} × ${getCharDisplayName(r.b)}：${r.type}`);
+        });
+      }
+
+      const free = freeText.value.trim();
+      if (free) {
+        lines.push(`\n【具体的な設定・指示】\n${free}`);
+      }
+
+      return lines.join("\n");
+    }
+
+    function updatePreview() {
+      const text = buildPrompt();
+      preview.textContent = text;
+      promptLengthEl.textContent = `${text.length}文字`;
+    }
+
+    function copyPrompt() {
+      const text = buildPrompt();
+      navigator.clipboard.writeText(text).then(() => {
+        const btn = document.getElementById("copyBtn");
+        btn.textContent = "コピーしました！";
+        btn.classList.add("copied");
+        setTimeout(() => {
+          btn.textContent = "プロンプトをコピー";
+          btn.classList.remove("copied");
+        }, 1800);
+      });
+    }
+
+    function resetSelection() {
+      Object.keys(storySelected).forEach(k => storySelected[k].clear());
+      characters = Array.from({ length: MAX_CHARS }, () => createEmptyChar());
+      relations = [];
+      freeText.value = "";
+      isEroticMode = false;
+      document.getElementById("eroticCheck").checked = false;
+      document.getElementById("eroticToggleLabel").classList.remove("active");
+      document.getElementById("eroticPanel").classList.remove("show");
+      renderAll();
+    }
+
+    renderAll();
+  </script>
+</body>
+</html>
